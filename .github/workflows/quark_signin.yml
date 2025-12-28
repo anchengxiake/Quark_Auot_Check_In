@@ -6,6 +6,10 @@ on:
     - cron: '0 5 * * *'   # 北京时间 13:00 (UTC+8 -> UTC+5)
   workflow_dispatch:      # 允许手动触发
 
+env:
+  SENDKEY: ${{ secrets.SENDKEY }}
+  SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+
 jobs:
   check-if-already-signed:
     runs-on: ubuntu-latest

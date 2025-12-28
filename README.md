@@ -6,7 +6,7 @@
 
 > 🛑 **警告**：本项目遵循 [MIT 协议](https://opensource.org/licenses/MIT)。任何对项目的修改和发布必须保留原作者署名。
 >
-> **本项目禁止传播，有缘人自会看到。**
+> **本项目禁止传播，有缘人自会看到。给个星标再 fork 吧，求求了**
 >
 > 本仓库严厉谴责 [2pacJay/Quark_Auot_Check_In](https://github.com/2pacJay/Quark_Auot_Check_In) 仓库 **抹除原作者署名权的行为**，该行为严重违反 MIT 协议，侵害开源精神！
 
@@ -23,6 +23,7 @@
   - **新增：自动清理旧记录**：自动删除旧的 Workflow 运行记录，保持 Actions 页面整洁。
 - 本项目基于 BNDou大佬的项目中夸克网盘自动签到的子功能 https://github.com/BNDou/Auto_Check_In 修改而来
 - 感谢  [Spectrollay](https://github.com/Spectrollay) 对工作流的优化
+- 感谢  [haozihong ](https://github.com/Spectrollay) 对工作流的优化
 
 ---
 
@@ -122,3 +123,34 @@
 ---
 
 🎉 **欢迎提交 PR 和 Star 支持项目发展！**
+
+---
+
+## 📨 可选：Server 酱（SCT）推送
+
+如果希望在签到完成后收到通知，可使用 Server 酱（SCT）接收推送。项目已内置最小实现，文件： [Quark_Auot_Check_In/push_serverchan.py](Quark_Auot_Check_In/push_serverchan.py)。
+
+- 本地测试（PowerShell）：
+
+```powershell
+$env:SENDKEY='SCT你的SendKey'; python -c "import sys; sys.path.append('Quark_Auot_Check_In'); from push_serverchan import send_serverchan; send_serverchan('测试推送','来自仓库的测试消息')"
+```
+
+- 本地测试（bash / Linux / macOS）：
+
+```bash
+export SENDKEY='SCT你的SendKey'
+python -c "import sys; sys.path.append('Quark_Auot_Check_In'); from push_serverchan import send_serverchan; send_serverchan('测试推送','来自仓库的测试消息')"
+```
+
+- 在 GitHub Actions 中使用：
+
+   1. 进入仓库 **Settings → Secrets and variables → Actions**。
+   2. 新建 Secret 名称为 `SENDKEY`（或 `SERVERCHAN_SENDKEY`），值为你的 Server 酱 API Key（形如 `SCT...`）。
+   3. 无需修改 Workflow，脚本会自动读取该环境变量并发送推送。
+
+- 实现说明：
+   - `push_serverchan.py` 使用标准库发起 POST 请求到 `https://sctapi.ftqq.com/{SENDKEY}.send`。
+   - `checkIn_Quark.py` 中的 `send()` 函数会优先调用 Server 酱，若未配置则回退到控制台输出。
+
+---

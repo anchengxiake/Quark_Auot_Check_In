@@ -2,12 +2,23 @@ import os
 import re 
 import sys 
 import requests 
+from push_serverchan import send_serverchan
 
 cookie_list = os.getenv("COOKIE_QUARK").split('\n|&&')
 
-# 替代 notify 功能
+# 替代 notify 功能：优先使用 Server 酱（SENDKEY），否则打印到控制台
 def send(title, message):
-    print(f"{title}: {message}")
+    sendkey = os.getenv("SENDKEY") or os.getenv("SERVERCHAN_SENDKEY")
+    if sendkey:
+        try:
+            sent = send_serverchan(title, message, sendkey)
+            if not sent:
+                print(f"{title}: {message}")
+        except Exception as e:
+            print(f"推送异常，回退到控制台输出: {e}")
+            print(f"{title}: {message}")
+    else:
+        print(f"{title}: {message}")
 
 # 获取环境变量 
 def get_env(): 

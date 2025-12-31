@@ -2,18 +2,44 @@ import os
 import urllib.request
 import urllib.parse
 import json
+import datetime
+
+
+def _today_str():
+    return datetime.datetime.utcnow().date().isoformat()
 
 
 def send_serverchan(title: str, message: str, sendkey: str = None) -> bool:
-    """通过 Server 酱（SCT）发送推送（仅使用标准库）。
+    """通过 Server 酱（SCT）发送推送，并支持每日限频。
 
-    优先使用传入的 sendkey，若没有则尝试从环境变量中读取 `SENDKEY` 或 `SERVERCHAN_SENDKEY`。
-    返回 True 表示请求已发送并且 API 返回成功，否则返回 False。
+    行为：
+    - 优先使用传入的 `sendkey`，否则读取环境变量 `SENDKEY` 或 `SERVERCHAN_SENDKEY`。
+    - 默认启用每日一次推送限制：若当天已经推送过，则跳过实际发送并返回 True（视为已处理）。
+      可通过环境变量 `PUSH_ONCE_DAILY=0` 关闭此限制。
+    - 可通过环境变量 `PUSH_FORCE=1` 强制发送并跳过限频检查。
     """
     sendkey = sendkey or os.getenv("SENDKEY") or os.getenv("SERVERCHAN_SENDKEY")
     if not sendkey:
         print("ServerChan: no sendkey configured")
         return False
+
+    # 是否启用每日一次限制（默认开启）
+    once_daily = os.getenv("PUSH_ONCE_DAILY", "1").lower() not in ("0", "false", "no")
+    force_push = os.getenv("PUSH_FORCE", os.getenv("SERVERCHAN_FORCE_PUSH", "0")).lower() in ("1", "true", "yes")
+
+    last_file = os.path.join(os.path.dirname(__file__), ".last_push_date")
+    today = _today_str()
+
+    if once_daily and not force_push:
+        try:
+            if os.path.exists(last_file):
+                with open(last_file, "r", encoding="utf-8") as f:
+                    last = f.read().strip()
+                if last == today:
+                    print("ServerChan: 今日已推送，跳过本次发送。")
+                    return True
+        except Exception as e:
+            print(f"读取推送记录文件失败（忽略并继续）: {e}")
 
     desp = message.replace("\n", "\n\n")
     url = f"https://sctapi.ftqq.com/{sendkey}.send"
@@ -26,37 +52,37 @@ def send_serverchan(title: str, message: str, sendkey: str = None) -> bool:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             resp_text = resp.read().decode("utf-8", errors="ignore")
-            # 打印完整返回，便于调试不同版本的 Server 酱
             print(f"ServerChan response text: {resp_text}")
             try:
                 body = json.loads(resp_text)
             except Exception:
                 body = resp_text
-            # 尝试获取状态码（兼容不同 Python 版本的 HTTPResponse 接口）
             status = getattr(resp, 'status', None) or (resp.getcode() if hasattr(resp, 'getcode') else None)
             print(f"ServerChan push status: {status}, body: {body}")
 
-            # 根据返回内容判断是否成功（支持多种 Server 酱/第三方实现）
+            success = False
             if isinstance(body, dict):
-                # 常见成功标志： code/errno/error 为 0
                 if body.get("code") == 0 or body.get("errno") == 0 or body.get("error") == 0:
-                    return True
-                # 部分实现返回 data 键（即使为空），视为请求已被接受
-                if "data" in body:
-                    return True
-                # 检查常见的 message/errmsg 字段
-                msg = (body.get("message") or body.get("errmsg") or "").lower()
-                if msg in ("ok", "success", "success."):
-                    return True
-                # 检查 success 字段
-                if body.get("success") in (True, "true", "ok", "success"):
-                    return True
+                    success = True
+                elif "data" in body:
+                    success = True
+                else:
+                    msg = (body.get("message") or body.get("errmsg") or "").lower()
+                    if msg in ("ok", "success", "success."):
+                        success = True
+                    if body.get("success") in (True, "true", "ok", "success"):
+                        success = True
+            else:
+                if status and 200 <= int(status) < 300:
+                    success = True
 
-                # 以上条件都不满足则视为失败
-                return False
-
-            # 非 JSON 返回时，只要是 2xx 状态码就认为已发送
-            if status and 200 <= int(status) < 300:
+            if success:
+                # 写入当天记录，忽略写入错误
+                try:
+                    with open(last_file, "w", encoding="utf-8") as f:
+                        f.write(today)
+                except Exception as e:
+                    print(f"写入推送记录失败（忽略）: {e}")
                 return True
 
             return False

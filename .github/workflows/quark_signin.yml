@@ -3,7 +3,6 @@ name: Quark签到
 on:
   schedule:
     - cron: '0 1 * * *'   # 北京时间 09:00 (UTC+8 -> UTC+1)
-    - cron: '0 5 * * *'   # 北京时间 13:00 (UTC+8 -> UTC+5)
   workflow_dispatch:      # 允许手动触发
 
 env:
@@ -53,18 +52,18 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v3
 
-      - name: 随机延迟（早上）
+      - name: 随机延迟
         if: github.event.schedule == '0 1 * * *'
         run: |
           delay=$((RANDOM % 60))
-          echo "早上签到，延迟 $delay 秒后开始.."
+          echo "签到延迟 $delay 秒后开始.."
           sleep $delay
 
-      - name: 随机延迟（下午/手动触发）
-        if: github.event.schedule == '0 5 * * *' || github.event_name == 'workflow_dispatch'
+      - name: 随机延迟（手动触发）
+        if: github.event_name == 'workflow_dispatch'
         run: |
           delay=$((RANDOM % 30))
-          echo "下午兜底或手动触发，延迟 $delay 秒后开始.."
+          echo "手动触发，延迟 $delay 秒后开始.."
           sleep $delay
 
       - name: 设置Python环境

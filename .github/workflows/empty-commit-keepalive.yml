@@ -1,40 +1,56 @@
-name: 单独分支空提交保活
+name: 保活（heartbeat 孤儿分支）
 
 on:
   schedule:
-    - cron: "0 9 1 * *" # 每月 1 日
-  workflow_dispatch: {}   # 支持手动触发，方便测试
+    - cron: "0 9 1 * *" # 每月 1 日 UTC 09:00
+  workflow_dispatch:
 
 permissions:
-  contents: write   # 需要写权限来 push
+  contents: write # 仅本工作流需要写权限
 
 env:
-  BRANCH_NAME: heartbeat   # 目标分支名，可修改
+  BRANCH_NAME: heartbeat # 目标分支名，可修改
+
+concurrency:
+  group: keepalive-${{ github.repository }}
+  cancel-in-progress: true
 
 jobs:
   empty-commit-keepalive:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Init empty repo
+      - name: 初始化空仓库
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          # 初始化一个全新的 git 仓库，不依赖 actions/checkout
-          git init .
-          # 设置提交作者为 GitHub Actions 官方 bot
-          git config user.name  "github-actions[bot]"
+          set -euo pipefail
+          git init -q .
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # 配置远端，使用 GitHub 自动注入的 GITHUB_TOKEN
-          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          # token 走环境变量拼接，避免明文出现在 YAML 与命令回显里
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-      - name: Create orphan branch
+      - name: 创建孤儿分支并提交
+        shell: bash
         run: |
-          # 创建孤儿分支，没有历史和文件
-          git checkout --orphan "${BRANCH_NAME}"
-          # 空白提交
-          git commit --allow-empty -m "chore(heartbeat): monthly empty commit $(date -u +%Y-%m-%d)"
-          # 确认分支名正确
+          set -euo pipefail
+          git checkout -q --orphan "${BRANCH_NAME}"
+          git commit -q --allow-empty -m "chore(heartbeat): monthly empty commit $(date -u +%Y-%m-%d)"
           git branch -M "${BRANCH_NAME}"
 
-      - name: Push (force overwrite)
+      - name: 强制推送（失败重试 3 次）
+        shell: bash
         run: |
-          # 强制推送，无需 checkout，workflow 最简单
-          git push -f origin "${BRANCH_NAME}"
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if git push -f origin "${BRANCH_NAME}"; then
+              echo "保活提交推送成功。"
+              exit 0
+            fi
+            echo "第 ${attempt} 次推送失败，等待后重试。"
+            sleep $((attempt * 5))
+          done
+          echo "保活提交推送失败。" >&2
+          exit 1

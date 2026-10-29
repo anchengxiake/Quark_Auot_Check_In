@@ -1,8 +1,8 @@
 # ⭐️ 夸克网盘自动签到
 
-![GitHub stars](https://img.shields.io/github/stars/Liu8Can/Quark_Auot_Check_In) ![GitHub forks](https://img.shields.io/github/forks/Liu8Can/Quark_Auot_Check_In) ![License](https://img.shields.io/github/license/Liu8Can/Quark_Auot_Check_In) ![Last Commit](https://img.shields.io/github/last-commit/Liu8Can/Quark_Auot_Check_In) ![GitHub Actions](https://github.com/Liu8Can/Quark_Auot_Check_In/actions/workflows/quark_signin.yml/badge.svg)
+![GitHub stars](https://img.shields.io/github/stars/Liu8Can/Quark_Auto_Check_In) ![GitHub forks](https://img.shields.io/github/forks/Liu8Can/Quark_Auto_Check_In) ![License](https://img.shields.io/github/license/Liu8Can/Quark_Auto_Check_In) ![Last Commit](https://img.shields.io/github/last-commit/Liu8Can/Quark_Auto_Check_In) ![GitHub Actions](https://github.com/Liu8Can/Quark_Auto_Check_In/actions/workflows/quark_signin.yml/badge.svg)
 
-🎉 **本项目实现了夸克网盘的自动签到功能**，通过 GitHub Actions 自动执行，领取每日签到奖励空间，让用户无需手动操作！
+🎉 通过 GitHub Actions 每天自动完成夸克网盘签到，领取签到奖励空间。
 
 > 🛑 **警告**：本项目遵循 [MIT 协议](https://opensource.org/licenses/MIT)。任何对项目的修改和发布必须保留原作者署名。
 >
@@ -12,18 +12,17 @@
 
 ---
 
-## 🚀 功能简介
+## 🚀 功能
 
-- **每日自动签到**：定时运行脚本完成每日签到，领取成长奖励。
-  - **每日一次签到尝试**：在北京时间早上 9 点左右尝试签到，确保每日奖励领取。
-  - **新增：防止重复签到**：脚本会记录当日成功签到状态，避免不必要的重复执行。
-  - **新增：随机延迟执行**：签到前加入随机延迟，模拟人工操作，降低被检测风险。
-- **GitHub Actions 托管**：一键配置后，脚本每天自动运行，实现真正的“一劳永逸”。
-  - **新增：自动保持仓库活跃**：通过空提交防止 GitHub因仓库不活跃而禁用 Actions。
-  - **新增：自动清理旧记录**：自动删除旧的 Workflow 运行记录，保持 Actions 页面整洁。
-- 本项目基于 BNDou大佬的项目中夸克网盘自动签到的子功能 https://github.com/BNDou/Auto_Check_In 修改而来
-- 感谢  [Spectrollay](https://github.com/Spectrollay) 对工作流的优化
-- 感谢  [haozihong ](https://github.com/Spectrollay) 对工作流的优化
+- **每日自动签到**：北京时间约 09:00 执行，13:00 再进行一次失败兜底。
+- **两种账号格式**：既支持老的 `kps / sign / vcode` 手填，也支持直接粘贴新版抓包的完整 URL（脚本自动提取参数）。
+- **多账号隔离**：按账号逐个执行，某个账号失败不会影响其他账号；只要有账号失败，工作流整体返回失败，从而保留 13:00 的补签机会。
+- **当日去重**：所有账号成功后写入「当天日期」的 Actions 缓存，重复触发会直接跳过，不会重复签到。
+- **推送可选**：配置 Server 酱即可在签到后收到微信推送，未配置则只打印控制台日志。
+- **凭证体检**：手动触发时可选 `dry_run`，只校验凭证与签到状态、不真正提交签到。
+- **保活**：每月在独立的 `heartbeat` 孤儿分支生成一条空提交，不污染 `main` 历史。
+
+**致谢**：本项目基于 [BNDou/Auto_Check_In](https://github.com/BNDou/Auto_Check_In) 中夸克网盘签到子功能修改而来，感谢 [Spectrollay](https://github.com/Spectrollay) 与 [haozihong](https://github.com/haozihong) 对工作流的优化。
 
 ---
 
@@ -33,78 +32,138 @@
 
 点击右上角的 `Fork` 按钮，将本项目复制到自己的 GitHub 仓库。
 
-### 2️⃣ 配置 Cookie 信息
+### 2️⃣ 获取签到参数
 
-通过 GitHub Secrets 配置用户的 Cookie 信息，具体步骤如下：
+推荐使用 **MuMu 模拟器 + Root + ProxyPin** 抓包（新版夸克 App 对用户证书校验较严，实体机通常需要 Root 才能解密 HTTPS）：
 
-#### 🛠️ 获取 COOKIE_QUARK
+1. MuMu 设置中开启 Root，安装夸克 App 与 [ProxyPin](https://github.com/wanghongenpin/proxypin)。
+2. 把 ProxyPin 的 CA 证书安装为 Android **系统证书**。
+3. 打开夸克网盘的签到页，在 ProxyPin 中筛选域名 `drive-m.quark.cn`。
+4. 找到类似 `https://drive-m.quark.cn/1/clouddrive/act/growth/reward?...` 的请求，**原样复制完整 URL**（不要手动改动其中的 `+`、`=`、`%xx`）。
+5. 按下面任一格式整理账号信息：
 
-使用手机抓包工具（小白推荐 [proxypin](https://github.com/wanghongenpin/proxypin)）获取 Cookie 信息：
+   ```text
+   # 推荐：直接贴完整 URL
+   user=张三; url=https://drive-m.quark.cn/1/clouddrive/act/growth/reward?...;
 
-1. 打开手机抓包工具，访问夸克网盘签到页。
-2. 找到接口 `https://drive-m.quark.cn/1/clouddrive/capacity/growth/info` 的请求信息。
-3. 复制请求中的参数：`kps`、`sign` 和 `vcode`。【初步测试发现这个 Key 的值有效期在两个月左右】
-4. 将参数整理为以下格式：
-   ```
+   # 兼容：手动填参数
    user=张三; kps=abcdefg; sign=hijklmn; vcode=111111111;
    ```
 
-   > `user` 字段为用户名，可随意填写。多个账户可用 **回车或 && 分隔**。
-   >
+   > `user` 只是显示用昵称，可随意填写。多个账户用**换行**或 `&&` 分隔，空行会被忽略。
 
-#### 🔐 添加到 GitHub Secrets
+### 3️⃣ 添加 GitHub Secret
 
-1. 打开 Fork 后的仓库，进入 **Settings -> Secrets and variables -> Actions**。
-2. 点击 **Repository secrets** 分区下的 **New repository secret** 按钮。
-3. 创建名为 `COOKIE_QUARK` 的 Secret。
-4. 将整理好的 Cookie 信息粘贴到 "Secret" 输入框中并保存。
+进入 **Settings → Secrets and variables → Actions → New repository secret**：
+
+| Secret 名称 | 是否必填 | 说明 |
+| --- | --- | --- |
+| `COOKIE_QUARK` | 必填 | 上一步整理好的账号信息，多账号用换行或 `&&` 分隔 |
+| `SENDKEY` | 可选 | Server 酱 SendKey，支持 Turbo（`SCT` 开头）与 Server酱³（`sctp` 开头） |
+| `SERVERCHAN_SENDKEY` | 可选 | 同上，`SENDKEY` 未配置时的备用名 |
+
+### 4️⃣ 启用 GitHub Actions
+
+1. 打开 **Actions**，若顶部有黄色提示条，点击 **I understand my workflows, go ahead and enable them**。
+2. 签到工作流只使用 `contents: read` 权限，**不需要**把仓库的 Workflow permissions 改成读写；只有保活工作流需要 `contents: write`。
+3. 工作流会在北京时间每天约 09:00 自动运行。
+
+### 5️⃣ 手动测试
+
+**Actions → 夸克网盘每日签到 → Run workflow**：
+
+- 直接运行：真实执行签到。
+- 勾选 `dry_run`：只校验凭证与签到状态，不提交签到，也不会占用当天的成功标记。
 
 ---
 
-### 3️⃣ 启用 GitHub Actions 及设置权限
+## 🔁 执行与重试逻辑
 
-1. 打开 Fork 后的仓库，进入 **Actions** 选项卡。如果看到黄色的提示条 "Workflows aren't right ....... enable them"，点击 **"I understand my workflows, go ahead and enable them"** 按钮启用 Actions。
-2. **重要：设置 Workflow 权限**
-   * 进入仓库的 **Settings -> Actions -> General** 页面。
-   * 在 "Workflow permissions" 部分，选择 **"Read and write permissions"**。
-   * 点击 "Save" 保存。
-   * **此步骤是必需的**，以便 Actions 能够执行“保持仓库活跃”（空提交）和“清理旧的工作流记录”等操作。
-3. 启用后，你会看到名为 `Quark签到` (或 `Quark Sign-in`) 的工作流已配置完成。
-4. 脚本将按预设时间（北京时间每日约 9:00）自动运行。
-   * **运行时间说明**：默认设置在北京时间上午 9 点左右运行。由于 GitHub Actions 的计划任务调度机制，实际运行时间可能会有几分钟到几十分钟的延迟，这是正常现象。随机延迟的加入也会影响确切的启动时间。
-   * **执行逻辑**：脚本会先检查当天是否已成功签到。如果已签到，则跳过后续的签到操作。
+1. 按北京时间生成当天日期，作为缓存 key：`quark-signed-<YYYY-MM-DD>`。
+2. 缓存命中说明今天所有账号都已成功，直接跳过；否则逐个处理 `COOKIE_QUARK` 中的账号。
+3. 全部账号成功 → 写入当天成功标记 → 13:00 的那次任务直接跳过。
+4. 任一账号配置错误、凭证失效或接口异常 → 工作流返回失败且**不写标记** → 13:00 自动重试一次。
 
-### 4️⃣ 手动测试运行
+退出码约定（`python checkIn_Quark.py`）：
 
-1. 进入 **Actions** 选项卡，点击左侧的 `Quark签到` (或 `Quark Sign-in`) 工作流。
-2. 点击右侧的 **Run workflow** 按钮，然后再次点击绿色 **Run workflow** 按钮，手动触发任务以验证配置是否成功。
-3. 你可以点击运行中的 workflow 查看其执行日志和状态。
+| 退出码 | 含义 |
+| --- | --- |
+| `0` | 全部账号成功（含「今日已签到」） |
+| `1` | 至少一个账号失败，其余账号已尽力执行 |
+| `2` | `COOKIE_QUARK` 未配置或整体为空 |
+
+---
+
+## 📨 可选：Server 酱推送
+
+脚本内已内置最小实现（[push_serverchan.py](push_serverchan.py)），只依赖标准库：
+
+- `SCT...` 开头的 Turbo key → `https://sct.ftqq.com/{key}.send`
+- `sctp{uid}t...` 开头的 Server酱³ key → `https://{uid}.push.ft07.com/send/{key}.send`
+
+本地测试：
+
+```bash
+export SENDKEY='SCT你的SendKey'
+python push_serverchan.py
+```
+
+可选环境变量：
+
+| 变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `PUSH_ONCE_DAILY` | `0` | 设为 `1` 时每天只推送一次（以 `.last_push_date` 记录） |
+| `PUSH_FORCE` | `0` | 设为 `1` 时忽略上面的每日限制 |
+| `PUSH_TIMEOUT` | `10` | 推送请求超时秒数 |
+
+推送失败只会回退到控制台日志，不影响签到结果。
+
+---
+
+## ⚙️ 环境变量
+
+| 变量 | 说明 |
+| --- | --- |
+| `COOKIE_QUARK` | 账号信息，必填 |
+| `DRY_RUN` | 设为 `1` 时只校验凭证，不提交签到 |
+| `SENDKEY` / `SERVERCHAN_SENDKEY` | Server 酱推送 key，可选 |
 
 ---
 
 ## ❓ 常见问题
 
-1. **签到失败**：
+1. **提示「缺少必要参数」**
+   - 检查每个账号是否都含 `kps`、`sign`、`vcode`，或完整 URL 是否确实带有这三个查询参数。
+   - 注意 URL 里的 `+` 必须原样保留，脚本已按「只做百分号解码」的方式解析，不会把 `+` 当空格。
+2. **提示「获取成长信息失败」或「凭证失效」**
+   - 通常是抓到的参数已过期（有效期约两个月）或不完整，重新抓包并更新 `COOKIE_QUARK`。
+   - 接口临时异常也会让工作流失败，但不会写入当日成功缓存，因此仍有 13:00 的第二次机会。
+3. **单账号正常，多账号失败**
+   - 确认账号之间用换行或 `&&` 分隔，每个账号都是一套完整参数；日志里会明确指出失败的是第几个账号。
+4. **定时任务没有准点运行**
+   - GitHub Actions 的 schedule 天然会有数分钟到数十分钟延迟，脚本还会额外随机延迟最多 60 秒（13:00 那轮再多等 2 分钟以错开抖动）。
+5. **保活分支为什么每月被强制更新**
+   - `heartbeat` 是专门的孤儿分支，每月只保留最新一条空提交，用于避免长期无活动的 Fork 被 GitHub 停用定时任务，不会改动 `main`。
 
-   * 确认 `COOKIE_QUARK` Secret 中的信息准确无误且格式正确。
-   * Cookie 可能已过期，请尝试重新抓取并更新 Secret。
-   * 检查 Actions 日志，看是否有具体的错误信息。
-2. **GitHub Actions 未生效或报错 `Permission denied` / `GH006`**：
+---
 
-   * 确保已按照【3️⃣ 启用 GitHub Actions 及设置权限】中的步骤启用了 Actions。
-   * **最常见原因：** 确保在仓库的 "Settings -> Actions -> General" 中，"Workflow permissions" 已设置为 **"Read and write permissions"**。如果权限不足，空提交和清理记录步骤会失败。
-   * 检查 Actions 运行日志，查看具体的错误信息。
-3. **Workflow 显示跳过 (Skipped)**：
+## 🧪 本地开发
 
-   * 这是正常行为。如果当天已经成功签到，后续的任务在检查时会发现已签到，从而跳过实际的签到步骤。你可以在 `check-if-already-signed` job 的日志中看到类似 "今天已成功签到，跳过执行" 的信息。
+```bash
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m unittest discover -s tests -v
+```
+
+CI（[ci.yml](.github/workflows/ci.yml)）会做语法检查、单元测试，并校验「未配置凭证时退出码为 2」。
 
 ---
 
 ## ⚠️ 注意事项
 
 - 本项目仅供学习交流，请勿用于非法用途。
-- 如夸克网盘更新接口，需重新获取 Cookie 并调整代码（主要是 `checkIn_Quark.py` 脚本，Workflow 通常无需修改）。
-- 频繁手动触发可能会被目标服务限制，请谨慎操作。
+- 若夸克更新接口，通常只需调整 `checkIn_Quark.py`，工作流一般无需改动。
+- 频繁手动触发可能被目标服务限制，请谨慎操作。
+- 本项目基于 BNDou/Auto_Check_In 的夸克签到功能修改而来。
 
 ---
 
@@ -123,34 +182,3 @@
 ---
 
 🎉 **欢迎提交 PR 和 Star 支持项目发展！**
-
----
-
-## 📨 可选：Server 酱（SCT）推送
-
-如果希望在签到完成后收到通知，可使用 Server 酱（SCT）接收推送。项目已内置最小实现，文件： [Quark_Auot_Check_In/push_serverchan.py](Quark_Auot_Check_In/push_serverchan.py)。
-
-- 本地测试（PowerShell）：
-
-```powershell
-$env:SENDKEY='SCT你的SendKey'; python -c "import sys; sys.path.append('Quark_Auot_Check_In'); from push_serverchan import send_serverchan; send_serverchan('测试推送','来自仓库的测试消息')"
-```
-
-- 本地测试（bash / Linux / macOS）：
-
-```bash
-export SENDKEY='SCT你的SendKey'
-python -c "import sys; sys.path.append('Quark_Auot_Check_In'); from push_serverchan import send_serverchan; send_serverchan('测试推送','来自仓库的测试消息')"
-```
-
-- 在 GitHub Actions 中使用：
-
-   1. 进入仓库 **Settings → Secrets and variables → Actions**。
-   2. 新建 Secret 名称为 `SENDKEY`（或 `SERVERCHAN_SENDKEY`），值为你的 Server 酱 API Key（形如 `SCT...`）。
-   3. 无需修改 Workflow，脚本会自动读取该环境变量并发送推送。
-
-- 实现说明：
-   - `push_serverchan.py` 使用标准库发起 POST 请求到 `https://sctapi.ftqq.com/{SENDKEY}.send`。
-   - `checkIn_Quark.py` 中的 `send()` 函数会优先调用 Server 酱，若未配置则回退到控制台输出。
-
----
